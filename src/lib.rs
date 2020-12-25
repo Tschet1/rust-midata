@@ -7,22 +7,15 @@ extern crate tokio;
 extern crate serde_derive;
 extern crate cached;
 
-// TODO: doku
-// TODO: config
-// TODO: log in
-// TODO: authentication token
-// TODO: configuration
-// TODO: caching
-
 /// Module for requesting and storing of information on Midata
 pub mod midata {
     enum Token {
         XUserToken(String, String),
-        XToken(String)
+        XToken(String),
     }
 
     pub struct MidataConnection {
-        token: Token
+        token: Token,
     }
 
     /// Links of people to roles
@@ -75,7 +68,6 @@ pub mod midata {
         /// not mapped. utility to check if person has a leading function in any group.
         #[serde(skip)]
         pub is_leiter: bool,
-
         // NOTE: Update merge_persons if more fields are added
     }
 
@@ -172,18 +164,18 @@ pub mod midata {
     /// You will not get all the details about the groups/people when using this authentication method
     pub fn connection_with_application_token(token: String) -> MidataConnection {
         return MidataConnection {
-            token: Token::XToken(token)
-        }
+            token: Token::XToken(token),
+        };
     }
 
     /// authenticate using email and password
     pub fn connection_with_login_token(email: String, password: String) -> MidataConnection {
         let mut mc = MidataConnection {
-            token : Token::XUserToken("".to_string(), "".to_string()), //TODO: maybe not needed
+            token: Token::XUserToken("".to_string(), "".to_string()),
         };
 
         mc.login(email, password);
-        return mc
+        return mc;
     }
 
     impl Group {
@@ -220,7 +212,10 @@ pub mod midata {
         /// # Note
         /// Use @ref get_persons if details are not needed since it is much faster (especially for large
         /// groups.)
-        pub fn get_persons_with_details<'a>(&'a mut self, connection: &MidataConnection) -> &'a Vec<Person> {
+        pub fn get_persons_with_details<'a>(
+            &'a mut self,
+            connection: &MidataConnection,
+        ) -> &'a Vec<Person> {
             let gid: u16 = self.id.parse().unwrap();
             let persons = self.get_persons(connection);
             let mut ids: Vec<(u16, u32)> = vec![];
@@ -241,13 +236,16 @@ pub mod midata {
         }
     }
 
-    fn merge_option_if_needed<T>(option_a:&mut Option<T>, option_b:Option<T>) {
+    fn merge_option_if_needed<T>(option_a: &mut Option<T>, option_b: Option<T>) {
         if option_a.is_none() && option_b.is_some() {
             option_a.replace(option_b.unwrap());
         }
     }
 
-    fn merge_option_vec_if_needed<T>(option_a: Option<Vec<T>>, option_b:Option<Vec<T>>) -> Option<Vec<T>> {
+    fn merge_option_vec_if_needed<T>(
+        option_a: Option<Vec<T>>,
+        option_b: Option<Vec<T>>,
+    ) -> Option<Vec<T>> {
         if option_a.is_none() && option_b.is_some() {
             return option_b;
         } else if option_a.is_some() && option_b.is_some() {
@@ -291,7 +289,8 @@ pub mod midata {
             merge_option_if_needed(&mut self.household_key, person.household_key);
             merge_option_if_needed(&mut self.picture, person.picture);
 
-            self.links.roles = merge_option_vec_if_needed(self.links.roles.clone(), person.links.roles);
+            self.links.roles =
+                merge_option_vec_if_needed(self.links.roles.clone(), person.links.roles);
             self.roles.append(&mut person.roles);
             self.is_loaded_fully = self.is_loaded_fully || person.is_loaded_fully;
             self.is_leiter = self.is_leiter || person.is_leiter;
@@ -299,7 +298,6 @@ pub mod midata {
     }
 
     impl MidataConnection {
-
         /// Load a group
         ///
         /// # Arguments
@@ -412,8 +410,8 @@ pub mod midata {
         pub fn load_people_of_groups(&self, ids: Vec<u16>) -> Vec<Person> {
             let responses: Vec<Response> = self.load(
                 ids.into_iter()
-                   .map(|id| Request::PeopleOfGroup(id))
-                   .collect(),
+                    .map(|id| Request::PeopleOfGroup(id))
+                    .collect(),
             );
             let mut persons: Vec<Person> = vec![];
             for r in responses {
@@ -451,8 +449,8 @@ pub mod midata {
         pub fn load_people(&self, ids: Vec<(u16, u32)>) -> Vec<Person> {
             let responses: Vec<Response> = self.load(
                 ids.into_iter()
-                   .map(|ids| Request::People(ids.0, ids.1))
-                   .collect(),
+                    .map(|ids| Request::People(ids.0, ids.1))
+                    .collect(),
             );
             let mut persons: Vec<Person> = vec![];
             for r in responses {
@@ -485,17 +483,34 @@ pub mod midata {
 
         fn login(&mut self, email: String, password: String) {
             #[tokio::main]
-            #[cached::proc_macro::cached(size = 1, convert = "{ format!(\"{}\", email) }", key = "String")]
-            async fn get_token(email: &str, password: &str) -> String{
-                let url = reqwest::Url::parse("https://db.scout.ch/users/sign_in.json").expect("parse error");
+            #[cached::proc_macro::cached(
+                size = 1,
+                convert = "{ format!(\"{}\", email) }",
+                key = "String"
+            )]
+            async fn get_token(email: &str, password: &str) -> String {
+                let url = reqwest::Url::parse("https://db.scout.ch/users/sign_in.json")
+                    .expect("parse error");
                 let client = reqwest::Client::new();
                 let params = [("person[email]", &email), ("person[password]", &password)];
-                let response = client.post(url).header("Accept", "application/json").form(&params).send().await.expect("Failed to authenticate with midata.");
+                let response = client
+                    .post(url)
+                    .header("Accept", "application/json")
+                    .form(&params)
+                    .send()
+                    .await
+                    .expect("Failed to authenticate with midata.");
                 let response = response
                     .json::<Response>()
                     .await
                     .expect("Could not deserialize to json");
-                 return response.people.unwrap().pop().unwrap().authentication_token.unwrap();
+                return response
+                    .people
+                    .unwrap()
+                    .pop()
+                    .unwrap()
+                    .authentication_token
+                    .unwrap();
             }
             let token = get_token(&email, &password);
             self.token = Token::XUserToken(email, token);
@@ -506,7 +521,11 @@ pub mod midata {
             let client = reqwest::Client::new();
 
             #[cached::proc_macro::cached(size = 1000, convert = "{request}", key = "Request")]
-            async fn _load_int(client: &reqwest::Client, request: Request, credentials: &MidataConnection) -> Response {
+            async fn _load_int(
+                client: &reqwest::Client,
+                request: Request,
+                credentials: &MidataConnection,
+            ) -> Response {
                 let url = match request {
                     Request::Groups(id) => {
                         format!("https://db.scout.ch/de/groups/{}", id)
@@ -525,22 +544,30 @@ pub mod midata {
 
                 match &credentials.token {
                     Token::XToken(token) => {
-                        headers.insert("X-Token", reqwest::header::HeaderValue::from_str(&token).unwrap());
-                    },
+                        headers.insert(
+                            "X-Token",
+                            reqwest::header::HeaderValue::from_str(&token).unwrap(),
+                        );
+                    }
                     Token::XUserToken(user, token) => {
-                        headers.insert("X-User-Token", reqwest::header::HeaderValue::from_str(&token).unwrap());
-                        headers.insert("X-User-Email", reqwest::header::HeaderValue::from_str(&user).unwrap());
+                        headers.insert(
+                            "X-User-Token",
+                            reqwest::header::HeaderValue::from_str(&token).unwrap(),
+                        );
+                        headers.insert(
+                            "X-User-Email",
+                            reqwest::header::HeaderValue::from_str(&user).unwrap(),
+                        );
                     }
                 }
-                headers.insert("Accept", reqwest::header::HeaderValue::from_static(&"application/json"));
+                headers.insert(
+                    "Accept",
+                    reqwest::header::HeaderValue::from_static(&"application/json"),
+                );
 
-                let body = client
-                    .get(url)
-                    .headers(headers)
-                    .send();
+                let body = client.get(url).headers(headers).send();
 
                 let body = body.await.expect("Error loading body");
-                //TODO: break here
                 let mut response = body
                     .json::<Response>()
                     .await
@@ -586,30 +613,30 @@ mod tests {
     #[test]
     fn load_group() {
         let mc = login();
-        let res = mc.load_groups(vec!(6497, 0));
-        for r in res{
+        let res = mc.load_groups(vec![6497, 0]);
+        for r in res {
             println!("{:?}", r);
         }
     }
-    
+
     #[test]
     fn load_persons_of_group() {
         let mc = login();
-        let res = mc.load_people_of_groups(vec!(5763));
-        for r in res{
+        let res = mc.load_people_of_groups(vec![5763]);
+        for r in res {
             println!("{:?}", r);
         }
     }
-    
+
     #[test]
     fn load_persons() {
         let mc = login();
-        let res = mc.load_people(vec!((5763,17773)));
-        for r in res{
+        let res = mc.load_people(vec![(5763, 17773)]);
+        for r in res {
             println!("{:?}", r);
         }
     }
-    
+
     #[test]
     fn load_steps() {
         let mc = login();
