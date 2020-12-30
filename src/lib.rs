@@ -169,12 +169,21 @@ pub mod midata {
     }
 
     /// authenticate using email and password
-    pub fn connection_with_login_token(email: String, password: String) -> MidataConnection {
+    pub fn connection_with_login(email: String, password: String) -> MidataConnection {
         let mut mc = MidataConnection {
             token: Token::XUserToken("".to_string(), "".to_string()),
         };
 
         mc.login(email, password);
+        return mc;
+    }
+
+    /// authenticate using email and password
+    pub fn connection_with_user_token(email: String, token: String) -> MidataConnection {
+        let mc = MidataConnection {
+            token: Token::XUserToken(email, token),
+        };
+
         return mc;
     }
 
@@ -606,7 +615,7 @@ pub mod midata {
 #[cfg(test)]
 mod tests {
     fn login() -> crate::midata::MidataConnection {
-        //crate::midata::connection_with_login_token("XXX".to_string(), "XXX".to_string())
+        //crate::midata::connection_with_login("XXX".to_string(), "XXX".to_string())
         crate::midata::connection_with_application_token("XXX".to_string())
     }
 
