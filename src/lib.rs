@@ -9,13 +9,15 @@ extern crate cached;
 
 /// Module for requesting and storing of information on Midata
 pub mod midata {
-    enum Token {
+    #[derive(PartialEq, Debug)]
+    pub enum Token {
         XUserToken(String, String),
         XToken(String),
+        XNone,
     }
 
     pub struct MidataConnection {
-        token: Token,
+        pub token: Token,
     }
 
     /// Links of people to roles
@@ -497,7 +499,7 @@ pub mod midata {
                 convert = "{ format!(\"{}\", email) }",
                 key = "String"
             )]
-            async fn get_token(email: &str, password: &str) -> String {
+            async fn get_token(email: &str, password: &str) -> Option<String> {
                 let url = reqwest::Url::parse("https://db.scout.ch/users/sign_in.json")
                     .expect("parse error");
                 let client = reqwest::Client::new();
@@ -514,15 +516,16 @@ pub mod midata {
                     .await
                     .expect("Could not deserialize to json");
                 return response
-                    .people
-                    .unwrap()
-                    .pop()
-                    .unwrap()
-                    .authentication_token
-                    .unwrap();
+                    .people?
+                    .pop()?
+                    .authentication_token;
             }
             let token = get_token(&email, &password);
-            self.token = Token::XUserToken(email, token);
+            if let Some(token) = token {
+                self.token = Token::XUserToken(email, token);
+            } else {
+                self.token = Token::XNone;
+            }
         }
 
         #[tokio::main]
@@ -567,6 +570,8 @@ pub mod midata {
                             "X-User-Email",
                             reqwest::header::HeaderValue::from_str(&user).unwrap(),
                         );
+                    }
+                    Token::XNone => {
                     }
                 }
                 headers.insert(
@@ -616,7 +621,7 @@ pub mod midata {
 mod tests {
     fn login() -> crate::midata::MidataConnection {
         //crate::midata::connection_with_login("XXX".to_string(), "XXX".to_string())
-        crate::midata::connection_with_application_token("XXX".to_string())
+        crate::midata::connection_with_application_token("".to_string())
     }
 
     #[test]
@@ -666,6 +671,21 @@ mod tests {
     #[test]
     fn person_has_no_household_key() {
         let mc = login();
+        let res = mc.load_person(6497, 57306);
+        assert!(res.household_key.is_none());
+    }
+
+    #[test]
+    fn invalid_token() {
+        let mc = crate::midata::connection_with_application_token("XXX".to_string());
+        let res = mc.load_person(6497, 57306);
+        assert!(res.household_key.is_none());
+    }
+
+    #[test]
+    fn invalid_login() {
+        let mc = crate::midata::connection_with_login("XXX".to_string(), "XXX".to_string());
+        assert_eq!(mc.token, crate::midata::Token::XNone);
         let res = mc.load_person(6497, 57306);
         assert!(res.household_key.is_none());
     }
