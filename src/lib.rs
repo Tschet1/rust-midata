@@ -549,7 +549,6 @@ pub mod midata {
                         format!("https://db.scout.ch/de/groups/{}/people/{}", idg, idp)
                     }
                 };
-                println!("{}", url);
                 let url = reqwest::Url::parse(&url).expect("Failed to parse url");
 
                 let mut headers = reqwest::header::HeaderMap::new();
@@ -572,6 +571,7 @@ pub mod midata {
                         );
                     }
                     Token::XNone => {
+                        panic!("Missing token. Something is wrong.");
                     }
                 }
                 headers.insert(
